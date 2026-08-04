@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6f1ed">
+<title>我们的备婚手册</title>
+<style>
+html,body{height:100%;margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#f6f1ed;color:#2f2926}.loading{height:100%;display:grid;place-items:center;text-align:center;padding:20px}.card{width:min(520px,calc(100vw - 72px));padding:32px 30px;background:#fffdfb;border:1px solid #e8ddd6;border-radius:22px;box-shadow:0 14px 40px rgba(66,45,37,.08)}.mark{width:54px;height:54px;margin:0 auto 18px;border-radius:17px;display:grid;place-items:center;background:linear-gradient(135deg,#a75f65,#c98a8f);color:white;font-size:25px;box-shadow:0 8px 20px rgba(167,95,101,.25)}h2{font-size:25px;margin:0 0 11px}p{margin:0;color:#81736c;line-height:1.7}.bar{width:220px;max-width:75%;height:7px;background:#eadfda;border-radius:99px;overflow:hidden;margin:22px auto 0}.bar:after{content:"";display:block;width:42%;height:100%;background:linear-gradient(90deg,#a75f65,#cc9296);border-radius:inherit;animation:move 1.05s infinite alternate ease-in-out}@keyframes move{to{transform:translateX(138%)}}.error{display:none}.error button{margin-top:18px;border:0;border-radius:12px;padding:11px 18px;background:#a75f65;color:white;font:inherit;cursor:pointer}.detail{font-size:12px;margin-top:12px;word-break:break-all;color:#a0928a}
+</style>
+</head>
+<body>
+<div class="loading">
+  <div class="card" id="loadingCard">
+    <div class="mark">囍</div>
+    <h2>正在打开备婚手册</h2>
+    <p id="status">正在加载清单数据，首次打开可能需要几秒钟。</p>
+    <div class="bar"></div>
+  </div>
+  <div class="card error" id="errorCard">
+    <div class="mark">囍</div>
+    <h2>页面暂时未能加载</h2>
+    <p>请检查网络后重试，或使用最新版 Chrome、Edge、Safari 浏览器打开。</p>
+    <button onclick="location.reload()">重新加载</button>
+    <div class="detail" id="errorDetail"></div>
+  </div>
+</div>
+<script>
+(async()=>{
+  const status=document.getElementById('status');
+  const base='https://raw.githubusercontent.com/hwang-thu/hwang-thu/main/wedding/';
+  const files=Array.from({length:7},(_,i)=>base+'part-'+String(i).padStart(2,'0')+'.txt');
+  try{
+    status.textContent='正在读取页面资源…';
+    const texts=await Promise.all(files.map(async url=>{
+      const r=await fetch(url,{cache:'no-cache'});
+      if(!r.ok) throw new Error('资源读取失败：'+r.status+' '+url);
+      return r.text();
+    }));
+    status.textContent='正在还原完整页面…';
+    const encoded=texts.join('').replace(/\s+/g,'');
+    const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+    let html;
+    if('DecompressionStream' in window){
+      const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      html=await new Response(stream).text();
+    }else{
+      status.textContent='正在加载兼容组件…';
+      await new Promise((resolve,reject)=>{
+        const s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js';
+        s.onload=resolve;s.onerror=()=>reject(new Error('兼容组件加载失败'));
+        document.head.appendChild(s);
+      });
+      html=new TextDecoder().decode(window.pako.ungzip(bytes));
+    }
+    if(!html.includes('<html')&&!html.includes('<!DOCTYPE')) throw new Error('页面数据校验失败');
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(err){
+    console.error(err);
+    document.getElementById('loadingCard').style.display='none';
+    document.getElementById('errorCard').style.display='block';
+    document.getElementById('errorDetail').textContent=String(err&&err.message?err.message:err);
+  }
+})();
+</script>
+</body>
+</html>
